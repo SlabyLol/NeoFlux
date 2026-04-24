@@ -1,1609 +1,791 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Neon Flux: Circuit Solver</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+:root{
+  --cy:#00ffff;--pk:#ff00aa;--ye:#ffff00;--gr:#00ff88;--or:#ff6600;
+  --bg:#020812;--pan:#040f1f;--cel:#060d1a;--grd:#0a1f35;--tx:#c0e8ff;--dim:#3a6080;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--tx);
+  font-family:'Share Tech Mono',monospace;display:flex;flex-direction:column}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9000;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,255,.012) 2px,rgba(0,255,255,.012) 4px)}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9001;
+  background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.6) 100%)}
 
-  :root {
-    --neon-cyan: #00f5ff;
-    --neon-green: #39ff14;
-    --neon-orange: #ff6b00;
-    --neon-pink: #ff0090;
-    --neon-yellow: #ffe600;
-    --bg-deep: #010a0f;
-    --bg-mid: #021520;
-    --bg-panel: #031e2d;
-    --grid-line: rgba(0, 245, 255, 0.08);
-    --cell-size: 60px;
-    --glow-cyan: 0 0 8px #00f5ff, 0 0 20px rgba(0,245,255,0.4);
-    --glow-green: 0 0 8px #39ff14, 0 0 20px rgba(57,255,20,0.4);
-    --glow-orange: 0 0 8px #ff6b00, 0 0 20px rgba(255,107,0,0.4);
-  }
+/* HEADER */
+#header{display:flex;align-items:center;justify-content:space-between;
+  padding:6px 12px;background:#010b16;border-bottom:1px solid #0a2040;flex-shrink:0;gap:8px;
+  flex-wrap:wrap}
+#logo{font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(12px,2vw,20px);
+  letter-spacing:3px;color:var(--cy);text-shadow:0 0 10px var(--cy);white-space:nowrap}
+#logo span{color:var(--pk);text-shadow:0 0 10px var(--pk)}
+#hud{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center}
+.hi{display:flex;flex-direction:column;align-items:center}
+.hl{font-size:8px;letter-spacing:2px;color:var(--dim);text-transform:uppercase}
+.hv{font-family:'Orbitron',sans-serif;font-size:clamp(12px,1.8vw,17px);font-weight:700;
+  color:var(--cy);text-shadow:0 0 8px var(--cy)}
+#copy{font-size:9px;color:var(--dim);white-space:nowrap}
+#tbar-w{width:70px;height:5px;background:#0a1f35;border-radius:3px;overflow:hidden;margin-top:2px}
+#tbar{height:100%;background:linear-gradient(90deg,var(--gr),var(--cy));border-radius:3px;transition:width 1s linear}
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+/* MAIN LAYOUT */
+#main{display:flex;flex:1;overflow:hidden}
 
-  body {
-    background: var(--bg-deep);
-    color: var(--neon-cyan);
-    font-family: 'Share Tech Mono', monospace;
-    min-height: 100vh;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    user-select: none;
-  }
+/* SIDEBAR – desktop */
+#sidebar{width:155px;min-width:130px;background:var(--pan);border-right:1px solid #0a2040;
+  display:flex;flex-direction:column;padding:8px 6px;gap:5px;overflow-y:auto;flex-shrink:0}
+.stitle{font-size:8px;letter-spacing:3px;color:var(--dim);text-transform:uppercase;
+  padding:3px 3px 5px;border-bottom:1px solid #0a2040;margin-bottom:2px}
+.pbtn{display:flex;align-items:center;gap:6px;padding:6px 8px;background:#060d1a;
+  border:1px solid #0a2040;border-radius:4px;cursor:pointer;transition:all .15s;
+  color:var(--tx);font-family:'Share Tech Mono',monospace;font-size:11px;width:100%;text-align:left}
+.pbtn:hover,.pbtn:active{border-color:var(--cy);background:#07142a}
+.pbtn.sel{border-color:var(--pk);background:#120818;box-shadow:0 0 10px rgba(255,0,170,.2)}
+.pico{width:22px;height:22px;flex-shrink:0}
+.abtn{padding:6px 8px;background:#060d1a;border:1px solid #0a2040;border-radius:4px;
+  cursor:pointer;color:var(--tx);font-family:'Share Tech Mono',monospace;font-size:10px;
+  letter-spacing:1px;text-align:center;transition:all .15s;text-transform:uppercase;width:100%}
+.abtn:hover,.abtn:active{border-color:var(--cy);color:var(--cy)}
+.abtn.pri{border-color:var(--pk);color:var(--pk)}
+.abtn.pri:hover{background:#1a0520}
 
-  /* Scanlines overlay */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0,0,0,0.12) 2px,
-      rgba(0,0,0,0.12) 4px
-    );
-    pointer-events: none;
-    z-index: 1000;
-  }
+/* GAME AREA */
+#game-area{flex:1;display:flex;align-items:center;justify-content:center;
+  padding:8px;overflow:hidden;position:relative}
+#grid-canvas{cursor:crosshair;display:block;touch-action:none}
+#status{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);
+  font-size:9px;letter-spacing:2px;color:var(--dim);pointer-events:none;
+  white-space:nowrap;text-align:center}
 
-  /* CRT vignette */
-  body::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.7) 100%);
-    pointer-events: none;
-    z-index: 999;
-  }
+/* MOBILE bottom toolbar */
+#mobile-bar{display:none;position:fixed;bottom:0;left:0;right:0;background:#010b16;
+  border-top:1px solid #0a2040;padding:5px 4px;gap:3px;z-index:800;flex-wrap:wrap;
+  justify-content:center;align-items:center}
+.mbtn{padding:5px 8px;background:#060d1a;border:1px solid #0a2040;border-radius:4px;
+  cursor:pointer;color:var(--tx);font-family:'Share Tech Mono',monospace;font-size:10px;
+  white-space:nowrap;touch-action:manipulation}
+.mbtn.sel{border-color:var(--pk);color:var(--pk)}
+.mbtn.pri{border-color:var(--pk);color:var(--pk)}
+.mbtn:active{background:#07142a}
 
-  /* Header */
-  #header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 20px;
-    background: linear-gradient(180deg, rgba(0,245,255,0.05) 0%, transparent 100%);
-    border-bottom: 1px solid rgba(0,245,255,0.2);
-    flex-shrink: 0;
-  }
+@media(max-width:600px){
+  #sidebar{display:none}
+  #mobile-bar{display:flex}
+  #game-area{padding-bottom:74px}
+  #status{display:none}
+}
 
-  #logo {
-    font-family: 'Orbitron', sans-serif;
-    font-weight: 900;
-    font-size: clamp(14px, 2vw, 22px);
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--neon-cyan);
-    text-shadow: var(--glow-cyan);
-  }
-
-  #logo span { color: var(--neon-orange); text-shadow: var(--glow-orange); }
-
-  #hud {
-    display: flex;
-    gap: 20px;
-    align-items: center;
-  }
-
-  .hud-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    font-size: 10px;
-    letter-spacing: 2px;
-    color: rgba(0,245,255,0.5);
-  }
-
-  .hud-value {
-    font-family: 'Orbitron', sans-serif;
-    font-size: clamp(14px, 2vw, 20px);
-    font-weight: 700;
-    color: var(--neon-cyan);
-    text-shadow: var(--glow-cyan);
-    transition: all 0.3s;
-  }
-
-  .hud-value.pulse {
-    animation: hudPulse 0.3s ease;
-  }
-
-  @keyframes hudPulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.3); color: var(--neon-green); text-shadow: var(--glow-green); }
-    100% { transform: scale(1); }
-  }
-
-  /* Main layout */
-  #main {
-    flex: 1;
-    display: flex;
-    gap: 0;
-    overflow: hidden;
-  }
-
-  /* Sidebar */
-  #sidebar {
-    width: 180px;
-    background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-mid) 100%);
-    border-right: 1px solid rgba(0,245,255,0.15);
-    display: flex;
-    flex-direction: column;
-    padding: 12px 10px;
-    gap: 10px;
-    flex-shrink: 0;
-    overflow-y: auto;
-  }
-
-  .sidebar-title {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 9px;
-    letter-spacing: 3px;
-    color: rgba(0,245,255,0.4);
-    text-transform: uppercase;
-    border-bottom: 1px solid rgba(0,245,255,0.1);
-    padding-bottom: 6px;
-    margin-bottom: 4px;
-  }
-
-  .piece-btn {
-    background: rgba(0,245,255,0.04);
-    border: 1px solid rgba(0,245,255,0.2);
-    border-radius: 6px;
-    padding: 8px 6px;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    transition: all 0.2s;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .piece-btn:hover {
-    background: rgba(0,245,255,0.1);
-    border-color: var(--neon-cyan);
-    box-shadow: 0 0 12px rgba(0,245,255,0.2);
-  }
-
-  .piece-btn.selected {
-    background: rgba(0,245,255,0.15);
-    border-color: var(--neon-cyan);
-    box-shadow: var(--glow-cyan), inset 0 0 12px rgba(0,245,255,0.1);
-  }
-
-  .piece-btn canvas {
-    width: 44px;
-    height: 44px;
-  }
-
-  .piece-label {
-    font-size: 9px;
-    letter-spacing: 1px;
-    color: rgba(0,245,255,0.7);
-    text-align: center;
-    line-height: 1.3;
-  }
-
-  .piece-count {
-    position: absolute;
-    top: 4px;
-    right: 6px;
-    font-family: 'Orbitron', sans-serif;
-    font-size: 10px;
-    color: var(--neon-orange);
-    text-shadow: var(--glow-orange);
-  }
-
-  /* Game area */
-  #game-area {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    overflow: hidden;
-  }
-
-  #canvas-container {
-    position: relative;
-    display: inline-block;
-  }
-
-  #game-canvas {
-    display: block;
-    cursor: crosshair;
-    image-rendering: pixelated;
-  }
-
-  /* Right panel */
-  #right-panel {
-    width: 160px;
-    background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-mid) 100%);
-    border-left: 1px solid rgba(0,245,255,0.15);
-    display: flex;
-    flex-direction: column;
-    padding: 12px 10px;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-
-  .action-btn {
-    background: transparent;
-    border: 1px solid rgba(0,245,255,0.3);
-    border-radius: 6px;
-    padding: 10px 8px;
-    cursor: pointer;
-    font-family: 'Orbitron', sans-serif;
-    font-size: 10px;
-    letter-spacing: 2px;
-    color: var(--neon-cyan);
-    text-transform: uppercase;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-  }
-
-  .action-btn:hover {
-    background: rgba(0,245,255,0.1);
-    border-color: var(--neon-cyan);
-    box-shadow: var(--glow-cyan);
-  }
-
-  .action-btn.primary {
-    border-color: var(--neon-green);
-    color: var(--neon-green);
-  }
-
-  .action-btn.primary:hover {
-    background: rgba(57,255,20,0.1);
-    box-shadow: var(--glow-green);
-  }
-
-  .action-btn.danger {
-    border-color: var(--neon-pink);
-    color: var(--neon-pink);
-  }
-
-  .action-btn.danger:hover {
-    background: rgba(255,0,144,0.1);
-    box-shadow: 0 0 8px #ff0090;
-  }
-
-  /* Progress bar */
-  .progress-bar {
-    height: 6px;
-    background: rgba(0,245,255,0.1);
-    border-radius: 3px;
-    overflow: hidden;
-    border: 1px solid rgba(0,245,255,0.2);
-  }
-
-  .progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-green));
-    box-shadow: var(--glow-cyan);
-    transition: width 0.3s ease;
-    border-radius: 3px;
-  }
-
-  .progress-label {
-    font-size: 9px;
-    letter-spacing: 2px;
-    color: rgba(0,245,255,0.4);
-    margin-bottom: 3px;
-  }
-
-  /* Tooltip */
-  #tooltip {
-    position: fixed;
-    background: rgba(1,10,15,0.95);
-    border: 1px solid rgba(0,245,255,0.4);
-    border-radius: 6px;
-    padding: 8px 12px;
-    font-size: 11px;
-    color: var(--neon-cyan);
-    pointer-events: none;
-    z-index: 500;
-    display: none;
-    max-width: 180px;
-    box-shadow: var(--glow-cyan);
-    line-height: 1.5;
-  }
-
-  /* Overlay screens */
-  .overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(1,10,15,0.92);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 800;
-    backdrop-filter: blur(4px);
-  }
-
-  .overlay-box {
-    background: linear-gradient(135deg, var(--bg-panel), var(--bg-mid));
-    border: 1px solid rgba(0,245,255,0.3);
-    border-radius: 12px;
-    padding: 40px;
-    text-align: center;
-    max-width: 480px;
-    width: 90%;
-    box-shadow: 0 0 40px rgba(0,245,255,0.15), 0 0 80px rgba(0,245,255,0.05);
-    position: relative;
-    overflow: hidden;
-  }
-
-  .overlay-box::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
-    box-shadow: 0 0 20px var(--neon-cyan);
-  }
-
-  .overlay-title {
-    font-family: 'Orbitron', sans-serif;
-    font-size: clamp(22px, 4vw, 36px);
-    font-weight: 900;
-    letter-spacing: 4px;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-    text-shadow: var(--glow-cyan);
-  }
-
-  .overlay-subtitle {
-    font-size: 12px;
-    letter-spacing: 3px;
-    color: rgba(0,245,255,0.5);
-    margin-bottom: 24px;
-    text-transform: uppercase;
-  }
-
-  .overlay-desc {
-    font-size: 13px;
-    color: rgba(0,245,255,0.7);
-    margin-bottom: 28px;
-    line-height: 1.7;
-  }
-
-  .overlay-btn {
-    display: inline-block;
-    background: transparent;
-    border: 2px solid var(--neon-cyan);
-    border-radius: 8px;
-    padding: 14px 32px;
-    font-family: 'Orbitron', sans-serif;
-    font-size: 13px;
-    letter-spacing: 3px;
-    color: var(--neon-cyan);
-    cursor: pointer;
-    text-transform: uppercase;
-    transition: all 0.2s;
-    margin: 6px;
-    box-shadow: var(--glow-cyan);
-  }
-
-  .overlay-btn:hover {
-    background: rgba(0,245,255,0.15);
-    transform: translateY(-2px);
-    box-shadow: 0 0 20px rgba(0,245,255,0.6), 0 4px 20px rgba(0,0,0,0.3);
-  }
-
-  .overlay-btn.green {
-    border-color: var(--neon-green);
-    color: var(--neon-green);
-    box-shadow: var(--glow-green);
-  }
-
-  .overlay-btn.green:hover {
-    background: rgba(57,255,20,0.15);
-    box-shadow: 0 0 20px rgba(57,255,20,0.6), 0 4px 20px rgba(0,0,0,0.3);
-  }
-
-  .diff-btns {
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-    flex-wrap: wrap;
-    margin-bottom: 20px;
-  }
-
-  .diff-btn {
-    background: transparent;
-    border: 1px solid rgba(0,245,255,0.3);
-    border-radius: 8px;
-    padding: 12px 20px;
-    cursor: pointer;
-    font-family: 'Orbitron', sans-serif;
-    font-size: 11px;
-    letter-spacing: 2px;
-    color: rgba(0,245,255,0.6);
-    text-transform: uppercase;
-    transition: all 0.2s;
-  }
-
-  .diff-btn:hover, .diff-btn.active {
-    background: rgba(0,245,255,0.1);
-    border-color: var(--neon-cyan);
-    color: var(--neon-cyan);
-    box-shadow: var(--glow-cyan);
-  }
-
-  /* Win screen special */
-  #win-screen .overlay-title { color: var(--neon-green); text-shadow: var(--glow-green); }
-
-  /* Level info */
-  .level-info {
-    font-size: 11px;
-    color: rgba(0,245,255,0.5);
-    letter-spacing: 2px;
-    text-align: center;
-    margin-top: 4px;
-  }
-
-  /* Particle canvas */
-  #particle-canvas {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 2;
-  }
-
-  /* Timer bar */
-  #timer-bar {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: rgba(255,107,0,0.2);
-  }
-
-  #timer-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--neon-orange), var(--neon-yellow));
-    box-shadow: var(--glow-orange);
-    transition: width 0.1s linear;
-  }
-
-  .copyright {
-    position: fixed;
-    bottom: 6px;
-    right: 12px;
-    font-size: 9px;
-    letter-spacing: 2px;
-    color: rgba(0,245,255,0.2);
-    z-index: 100;
-  }
-
-  /* Rotate hint */
-  .rotate-hint {
-    font-size: 9px;
-    color: rgba(0,245,255,0.3);
-    letter-spacing: 1px;
-    text-align: center;
-    margin-top: 2px;
-  }
-
-  /* Node legend */
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 10px;
-    color: rgba(0,245,255,0.5);
-    margin: 3px 0;
-  }
-
-  .legend-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  /* Scrollbar */
-  #sidebar::-webkit-scrollbar { width: 4px; }
-  #sidebar::-webkit-scrollbar-track { background: transparent; }
-  #sidebar::-webkit-scrollbar-thumb { background: rgba(0,245,255,0.2); border-radius: 2px; }
-
-  @media (max-width: 700px) {
-    #sidebar { width: 100px; }
-    #right-panel { width: 110px; }
-    :root { --cell-size: 45px; }
-    .piece-btn canvas { width: 36px; height: 36px; }
-  }
+/* OVERLAY */
+#overlay{position:fixed;inset:0;background:rgba(2,8,18,.93);display:flex;
+  align-items:center;justify-content:center;z-index:500}
+#overlay.h{display:none}
+.obox{background:var(--pan);border:1px solid #0d2a45;border-radius:8px;
+  padding:24px 28px;text-align:center;max-width:400px;width:92%;
+  box-shadow:0 0 50px rgba(0,255,255,.06);max-height:90vh;overflow-y:auto}
+.otitle{font-family:'Orbitron',sans-serif;font-size:clamp(18px,4vw,26px);font-weight:900;
+  color:var(--cy);text-shadow:0 0 15px var(--cy);letter-spacing:4px;margin-bottom:5px}
+.osub{font-size:11px;color:var(--pk);text-shadow:0 0 8px var(--pk);letter-spacing:3px;margin-bottom:14px}
+.odesc{font-size:11px;color:var(--tx);line-height:1.8;margin-bottom:14px}
+.odesc b{color:var(--cy)}
+.oscore{font-family:'Orbitron',sans-serif;font-size:32px;font-weight:700;
+  color:var(--ye);text-shadow:0 0 18px var(--ye);margin-bottom:5px}
+.lgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:14px;text-align:left}
+.li{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--dim)}
+.ld{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.diff-row{display:flex;gap:5px;justify-content:center;margin-bottom:16px;flex-wrap:wrap}
+.dbtn{padding:5px 11px;background:#060d1a;border:1px solid #0a2040;border-radius:4px;
+  color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;transition:all .15s}
+.dbtn.a,.dbtn:hover{border-color:var(--cy);color:var(--cy);background:#071427}
+.bbtn{display:inline-block;padding:9px 20px;background:transparent;border:1px solid var(--cy);
+  border-radius:4px;color:var(--cy);font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all .2s;
+  text-shadow:0 0 8px var(--cy);margin:3px}
+.bbtn:hover,.bbtn:active{background:rgba(0,255,255,.1);box-shadow:0 0 15px rgba(0,255,255,.3)}
+.bbtn.pk{border-color:var(--pk);color:var(--pk);text-shadow:0 0 8px var(--pk)}
+.bbtn.pk:hover{background:rgba(255,0,170,.1)}
 </style>
 </head>
 <body>
 
-<!-- Particle layer -->
-<canvas id="particle-canvas"></canvas>
-
-<!-- Header -->
 <div id="header">
-  <div id="logo">Neon <span>Flux</span>: Circuit Solver</div>
+  <div id="logo">Neon<span>:</span>Flux <span style="font-size:.7em;letter-spacing:1px;color:var(--tx);text-shadow:none">Circuit Solver</span></div>
   <div id="hud">
-    <div class="hud-item">
-      <div>LEVEL</div>
-      <div class="hud-value" id="hud-level">1</div>
-    </div>
-    <div class="hud-item">
-      <div>SCORE</div>
-      <div class="hud-value" id="hud-score">0</div>
-    </div>
-    <div class="hud-item">
-      <div>NODES</div>
-      <div class="hud-value" id="hud-nodes">0/0</div>
-    </div>
-    <div class="hud-item">
-      <div>MOVES</div>
-      <div class="hud-value" id="hud-moves">0</div>
+    <div class="hi"><div class="hl">LVL</div><div class="hv" id="hlvl">01</div></div>
+    <div class="hi"><div class="hl">SCORE</div><div class="hv" id="hscr">0</div></div>
+    <div class="hi"><div class="hl">NODES</div><div class="hv" id="hnod">0/0</div></div>
+    <div class="hi">
+      <div class="hl">TIME</div>
+      <div class="hv" id="htim" style="color:var(--gr)">01:00</div>
+      <div id="tbar-w"><div id="tbar" style="width:100%"></div></div>
     </div>
   </div>
+  <div id="copy">© DarkFox Co.</div>
 </div>
 
-<!-- Main -->
 <div id="main">
-  <!-- Sidebar: pieces -->
   <div id="sidebar">
-    <div class="sidebar-title">BAUSTEINE</div>
-    <div id="piece-list"></div>
-
-    <div class="sidebar-title" style="margin-top:8px">LEGENDE</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#39ff14;box-shadow:0 0 6px #39ff14"></div>QUELLE</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#ff6b00;box-shadow:0 0 6px #ff6b00"></div>KNOTEN</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#ff0090;box-shadow:0 0 6px #ff0090"></div>AKTIV</div>
-    <div class="legend-item"><div class="legend-dot" style="background:rgba(0,245,255,0.3)"></div>MAUER</div>
-
-    <div class="rotate-hint">RMB = Drehen</div>
+    <div class="stitle">Komponenten</div>
+    <button class="pbtn" id="pb-reflector" onclick="sel('reflector')">
+      <svg class="pico" viewBox="0 0 24 24"><line x1="4" y1="20" x2="20" y2="4" stroke="#ff00aa" stroke-width="2.5"/><line x1="4" y1="4" x2="20" y2="20" stroke="#ff00aa" stroke-width="1" stroke-dasharray="3 3" opacity=".4"/></svg>
+      Reflektor
+    </button>
+    <button class="pbtn" id="pb-rotator" onclick="sel('rotator')">
+      <svg class="pico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="#00ffff" stroke-width="1.5" stroke-dasharray="18 6"/><path d="M18 8 L21 12 L17 13 Z" fill="#00ffff"/></svg>
+      Rotator
+    </button>
+    <button class="pbtn" id="pb-splitter" onclick="sel('splitter')">
+      <svg class="pico" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12" stroke="#00ff88" stroke-width="2"/><line x1="15" y1="12" x2="21" y2="6" stroke="#00ff88" stroke-width="1.5"/><line x1="15" y1="12" x2="21" y2="18" stroke="#00ff88" stroke-width="1.5"/></svg>
+      Splitter
+    </button>
+    <button class="pbtn" id="pb-blocker" onclick="sel('blocker')">
+      <svg class="pico" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" fill="rgba(255,102,0,.15)" stroke="#ff6600" stroke-width="2"/><line x1="8" y1="8" x2="16" y2="16" stroke="#ff6600" stroke-width="1.5"/><line x1="16" y1="8" x2="8" y2="16" stroke="#ff6600" stroke-width="1.5"/></svg>
+      Blocker
+    </button>
+    <button class="pbtn" id="pb-erase" onclick="sel('erase')">
+      <svg class="pico" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" fill="none" stroke="#3a6080" stroke-width="1.5"/></svg>
+      Löschen
+    </button>
+    <div style="margin-top:6px">
+      <div class="stitle">Aktionen</div>
+      <button class="abtn pri" onclick="runSim()" style="margin-bottom:4px">▶ SIMULATE</button>
+      <button class="abtn" onclick="resetSim()" style="margin-bottom:3px">↺ RESET</button>
+      <button class="abtn" onclick="clearAll()" style="margin-bottom:3px">✕ CLEAR</button>
+      <button class="abtn" onclick="showMenu()" style="margin-top:3px">⌂ MENÜ</button>
+    </div>
+    <div style="margin-top:8px;font-size:9px;color:var(--dim);line-height:1.7">
+      <b style="color:var(--cy)">Rechtsklick</b> = rotieren<br>
+      <b style="color:var(--cy)">Long-press</b> = rotieren
+    </div>
   </div>
 
-  <!-- Game canvas area -->
   <div id="game-area">
-    <div id="level-info" class="level-info"></div>
-    <div id="canvas-container">
-      <canvas id="game-canvas"></canvas>
-      <div id="timer-bar"><div id="timer-fill" style="width:100%"></div></div>
-    </div>
-  </div>
-
-  <!-- Right panel -->
-  <div id="right-panel">
-    <div class="sidebar-title">AKTIONEN</div>
-    <button class="action-btn primary" id="btn-solve">▶ START</button>
-    <button class="action-btn" id="btn-reset">↺ RESET</button>
-    <button class="action-btn danger" id="btn-clear">✕ LEEREN</button>
-    <button class="action-btn" id="btn-next">→ WEITER</button>
-
-    <div style="margin-top:12px">
-      <div class="progress-label">FORTSCHRITT</div>
-      <div class="progress-bar">
-        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
-      </div>
-    </div>
-
-    <div style="margin-top:8px">
-      <div class="progress-label">ENERGIE</div>
-      <div class="progress-bar">
-        <div class="progress-fill" id="energy-fill" style="width:100%;background:linear-gradient(90deg,#ff6b00,#ffe600)"></div>
-      </div>
-    </div>
-
-    <div style="margin-top: auto; font-size:9px; color:rgba(0,245,255,0.25); letter-spacing:1px; line-height:1.7">
-      LMB = PLATZIEREN<br>
-      RMB = DREHEN<br>
-      DEL = ENTFERNEN<br>
-      ▶ = SIMULATION
-    </div>
+    <canvas id="grid-canvas"></canvas>
+    <div id="status">Komponente wählen → Zelle klicken</div>
   </div>
 </div>
 
-<!-- Tooltip -->
-<div id="tooltip"></div>
-
-<!-- Start screen -->
-<div class="overlay" id="start-screen">
-  <div class="overlay-box">
-    <div class="overlay-title">Neon Flux</div>
-    <div class="overlay-subtitle">Circuit Solver · DarkFox Co.</div>
-    <div class="overlay-desc">
-      Leite Energie durch das Gitter.<br>
-      Aktiviere alle Daten-Knoten um das Level zu lösen.<br>
-      Platziere Bausteine, starte die Simulation.
-    </div>
-    <div class="diff-btns">
-      <button class="diff-btn active" data-diff="easy">EASY</button>
-      <button class="diff-btn" data-diff="medium">MEDIUM</button>
-      <button class="diff-btn" data-diff="hard">HARD</button>
-    </div>
-    <button class="overlay-btn green" id="btn-start-game">SYSTEM STARTEN</button>
-  </div>
+<!-- MOBILE BAR -->
+<div id="mobile-bar">
+  <button class="mbtn" id="mb-reflector" onclick="sel('reflector')">╲ Reflect</button>
+  <button class="mbtn" id="mb-rotator"   onclick="sel('rotator')">↻ Rotate</button>
+  <button class="mbtn" id="mb-splitter"  onclick="sel('splitter')">⑃ Split</button>
+  <button class="mbtn" id="mb-blocker"   onclick="sel('blocker')">█ Block</button>
+  <button class="mbtn" id="mb-erase"     onclick="sel('erase')">⌫ Del</button>
+  <button class="mbtn pri" onclick="runSim()">▶ RUN</button>
+  <button class="mbtn" onclick="resetSim()">↺</button>
+  <button class="mbtn" onclick="clearAll()">✕</button>
+  <button class="mbtn" onclick="showMenu()">⌂</button>
 </div>
 
-<!-- Win screen -->
-<div class="overlay" id="win-screen" style="display:none">
-  <div class="overlay-box">
-    <div class="overlay-title">GELÖST!</div>
-    <div class="overlay-subtitle">Alle Knoten aktiviert</div>
-    <div id="win-stats" class="overlay-desc"></div>
-    <button class="overlay-btn green" id="btn-next-level">NÄCHSTES LEVEL</button>
-    <button class="overlay-btn" id="btn-restart-menu">MENÜ</button>
-  </div>
+<!-- OVERLAY -->
+<div id="overlay">
+  <div class="obox" id="obox"></div>
 </div>
-
-<!-- Game Over -->
-<div class="overlay" id="gameover-screen" style="display:none">
-  <div class="overlay-box">
-    <div class="overlay-title" style="color:var(--neon-pink);text-shadow:0 0 20px #ff0090">SYSTEM FEHLER</div>
-    <div class="overlay-subtitle">Energie erschöpft</div>
-    <div id="gameover-stats" class="overlay-desc"></div>
-    <button class="overlay-btn" id="btn-retry">↺ WIEDERHOLEN</button>
-    <button class="overlay-btn" id="btn-menu">MENÜ</button>
-  </div>
-</div>
-
-<div class="copyright">© 2025 DARKFOX CO. · NEON FLUX v1.0</div>
 
 <script>
-// =====================================================
-// NEON FLUX: CIRCUIT SOLVER
-// © DarkFox Co.
-// =====================================================
+// ═══════════════════════════════════════════════
+//  NEON FLUX  ©DarkFox Co.  –  Fixed v2
+// ═══════════════════════════════════════════════
 
-const DIRS = { R: [0,1], D: [1,0], L: [0,-1], U: [-1,0] };
-const DIR_KEYS = ['R','D','L','U'];
+const CV  = document.getElementById('grid-canvas');
+const CTX = CV.getContext('2d');
 
-// Piece types
-const PIECES = {
-  wire_h:    { label: 'LEITUNG\nH', ports: ['L','R'],         rotatable: false, color: '#00f5ff' },
-  wire_v:    { label: 'LEITUNG\nV', ports: ['U','D'],         rotatable: false, color: '#00f5ff' },
-  wire_lr:   { label: 'BIEGUNG', ports: ['R','D'],            rotatable: true,  color: '#00f5ff' },
-  wire_t:    { label: 'T-STÜCK', ports: ['L','R','D'],        rotatable: true,  color: '#00aaff' },
-  wire_cross:{ label: 'KREUZ',   ports: ['L','R','U','D'],    rotatable: false, color: '#00aaff' },
-  reflector: { label: 'REFLEKTOR', ports: ['R','U'],          rotatable: true,  color: '#ffe600' },
-  splitter:  { label: 'SPLITTER', ports: ['R','D','L'],       rotatable: true,  color: '#ff6b00' },
+// Directions: 0=Right 1=Down 2=Left 3=Up
+// DR[dir] = [deltaRow, deltaCol]
+const DR = [[0,1],[1,0],[0,-1],[-1,0]];
+
+const DIFF = {
+  easy:   {rows:6,  cols:8,  nodes:2, time:90},
+  normal: {rows:8,  cols:10, nodes:3, time:60},
+  hard:   {rows:9,  cols:12, nodes:4, time:45},
+  expert: {rows:11, cols:14, nodes:5, time:30},
 };
 
-// =====================================================
-// State
-// =====================================================
-const state = {
-  grid: [],
-  rows: 7, cols: 8,
-  cellSize: 60,
-  sources: [],
-  nodes: [],
-  walls: [],
-  selectedPiece: null,
-  pieces: {},   // { type: count }
-  moveCount: 0,
-  score: 0,
-  level: 1,
-  difficulty: 'easy',
-  simRunning: false,
-  energyFlow: [], // { r, c, dir, ... }
-  activatedNodes: new Set(),
-  energyLeft: 100,
-  timerInterval: null,
-  initialGrid: null,
-  initialPieces: null,
-  hoveredCell: null,
+let G = {
+  level:1, score:0, diff:'normal',
+  rows:8, cols:10, cs:56,
+  grid:[],
+  sources:[],  // {r, c, dir}
+  nodes:[],    // {r, c, active}
+  selPiece:null,
+  simDone:false,
+  beamSegs:[],  // {x1,y1,x2,y2} already in pixel coords
+  phase:'menu',
+  timeLeft:60, totalTime:60,
+  timerID:null,
+  hoverR:-1, hoverC:-1,
 };
 
-// =====================================================
-// Canvas & rendering
-// =====================================================
-const canvas = document.getElementById('game-canvas');
-const ctx = canvas.getContext('2d');
-const pCanvas = document.getElementById('particle-canvas');
-const pCtx = pCanvas.getContext('2d');
+// ── Cell factory ──
+function mkCell(){ return {type:'empty', placed:null, pdir:0, lit:false}; }
 
-let particles = [];
-let animFrame;
-let flowParticles = [];
+// ── Piece selection ──
+function sel(p){
+  G.selPiece = (G.selPiece===p) ? null : p;
+  document.querySelectorAll('.pbtn,.mbtn').forEach(b=>b.classList.remove('sel'));
+  if(G.selPiece){
+    document.getElementById('pb-'+p)?.classList.add('sel');
+    document.getElementById('mb-'+p)?.classList.add('sel');
+  }
+  setStatus(G.selPiece?`Platzieren: ${G.selPiece} · Zelle antippen`:'Komponente wählen → Zelle antippen');
+}
+function setStatus(t){ document.getElementById('status').textContent=t; }
 
-function resizeParticleCanvas() {
-  pCanvas.width = window.innerWidth;
-  pCanvas.height = window.innerHeight;
+// ── Resize ──
+function resize(){
+  const area=document.getElementById('game-area');
+  const W=area.clientWidth-16;
+  let H=area.clientHeight-16;
+  if(window.innerWidth<=600) H-=74;
+  const cs=Math.max(26, Math.min(70, Math.floor(Math.min(W/G.cols, H/G.rows))));
+  G.cs=cs;
+  CV.width =G.cols*cs;
+  CV.height=G.rows*cs;
+  draw();
+}
+window.addEventListener('resize', resize);
+
+// ── Mouse ──
+CV.addEventListener('click', e=>{
+  if(G.phase!=='playing') return;
+  const {r,c}=getRC(e.clientX, e.clientY);
+  if(ok(r,c)) clickCell(r,c);
+});
+CV.addEventListener('contextmenu', e=>{
+  e.preventDefault();
+  if(G.phase!=='playing') return;
+  const {r,c}=getRC(e.clientX, e.clientY);
+  if(ok(r,c)) rotateCell(r,c);
+});
+CV.addEventListener('mousemove', e=>{
+  const {r,c}=getRC(e.clientX, e.clientY);
+  if(G.hoverR!==r||G.hoverC!==c){ G.hoverR=r; G.hoverC=c; draw(); }
+});
+CV.addEventListener('mouseleave', ()=>{ G.hoverR=G.hoverC=-1; draw(); });
+
+// ── Touch ──
+let ts={x:0,y:0,t:0};
+CV.addEventListener('touchstart', e=>{
+  e.preventDefault();
+  const t=e.touches[0]; ts={x:t.clientX,y:t.clientY,t:Date.now()};
+},{passive:false});
+CV.addEventListener('touchend', e=>{
+  e.preventDefault();
+  if(G.phase!=='playing') return;
+  const dt=Date.now()-ts.t;
+  const {r,c}=getRC(ts.x, ts.y);
+  if(!ok(r,c)) return;
+  if(dt>450) rotateCell(r,c);
+  else clickCell(r,c);
+},{passive:false});
+
+function getRC(px,py){
+  const rect=CV.getBoundingClientRect();
+  return {r:Math.floor((py-rect.top)/G.cs), c:Math.floor((px-rect.left)/G.cs)};
+}
+function ok(r,c){ return r>=0&&r<G.rows&&c>=0&&c<G.cols; }
+
+function clickCell(r,c){
+  if(!G.selPiece) return;
+  const cell=G.grid[r][c];
+  if(cell.type==='source'||cell.type==='node') return;
+  if(G.selPiece==='erase'){ cell.placed=null; cell.pdir=0; }
+  else{ cell.placed=G.selPiece; cell.pdir=0; }
+  resetSim();
 }
 
-function setupCanvas() {
-  const cs = state.cellSize;
-  canvas.width  = state.cols * cs;
-  canvas.height = state.rows * cs;
+function rotateCell(r,c){
+  const cell=G.grid[r][c];
+  if(!cell.placed) return;
+  if(cell.placed==='reflector') cell.pdir=(cell.pdir+1)%2;
+  else if(cell.placed==='rotator') cell.pdir=(cell.pdir+1)%4;
+  resetSim();
 }
 
-// =====================================================
-// Level generation
-// =====================================================
-function diffConfig() {
-  const d = state.difficulty;
-  return {
-    easy:   { rows:6,  cols:7,  sources:1, nodes:2, walls:3,  time:120, pieceTypes:['wire_h','wire_v','wire_lr','wire_cross'], pieceCounts:[4,4,3,2] },
-    medium: { rows:7,  cols:8,  sources:2, nodes:4, walls:6,  time:90,  pieceTypes:['wire_h','wire_v','wire_lr','wire_t','wire_cross','reflector'], pieceCounts:[3,3,3,2,2,2] },
-    hard:   { rows:8,  cols:10, sources:2, nodes:5, walls:8,  time:60,  pieceTypes:['wire_h','wire_v','wire_lr','wire_t','wire_cross','reflector','splitter'], pieceCounts:[2,2,3,2,2,2,2] },
-  }[d];
-}
+// ── Level generation ──
+function generateLevel(){
+  const cfg=DIFF[G.diff];
+  G.rows=cfg.rows; G.cols=cfg.cols;
+  G.grid=[];
+  for(let r=0;r<G.rows;r++){
+    G.grid[r]=[];
+    for(let c=0;c<G.cols;c++) G.grid[r][c]=mkCell();
+  }
+  G.sources=[]; G.nodes=[];
 
-function generateLevel() {
-  const cfg = diffConfig();
-  state.rows = cfg.rows + Math.min(Math.floor((state.level-1)/3), 3);
-  state.cols = cfg.cols + Math.min(Math.floor((state.level-1)/4), 4);
-
-  // Responsive cell size
-  const availW = document.getElementById('game-area').clientWidth - 20;
-  const availH = document.getElementById('game-area').clientHeight - 40;
-  state.cellSize = Math.min(
-    Math.floor(availW / state.cols),
-    Math.floor(availH / state.rows),
-    70
-  );
-  state.cellSize = Math.max(state.cellSize, 38);
-
-  setupCanvas();
-
-  const rows = state.rows, cols = state.cols;
-  state.grid = Array.from({length: rows}, () => Array(cols).fill(null));
-  state.walls = [];
-  state.sources = [];
-  state.nodes = [];
-  state.activatedNodes = new Set();
-  state.simRunning = false;
-  state.energyFlow = [];
-  state.flowParticles = [];
-  flowParticles = [];
-
-  // Random helpers
-  const rnd = (a, b) => Math.floor(Math.random()*(b-a+1))+a;
-  const used = new Set();
-  const key = (r,c) => `${r},${c}`;
-  const place = (r,c) => { used.add(key(r,c)); return {r,c}; };
-  const free = () => {
-    let r,c,k, tries=0;
-    do { r=rnd(0,rows-1); c=rnd(0,cols-1); k=key(r,c); tries++; } while(used.has(k) && tries<200);
-    return {r,c};
-  };
-
-  // Sources (left edge)
-  const srcCount = Math.min(cfg.sources + Math.floor(state.level/5), 3);
-  for (let i=0;i<srcCount;i++) {
-    const r = rnd(1, rows-2);
-    if (!used.has(key(r,0))) {
-      state.sources.push(place(r,0));
-      state.grid[r][0] = { type:'source', rotation:0 };
-    }
+  // Sources on column 0, random rows
+  const nSrc=Math.min(1+Math.floor((G.level-1)/3), Math.floor(G.rows/2));
+  const srcRows=shuffle([...Array(G.rows).keys()]).slice(0,nSrc);
+  for(const r of srcRows){
+    G.grid[r][0].type='source';
+    G.grid[r][0].sdir=0; // shoots Right
+    G.sources.push({r, c:0, dir:0});
   }
 
-  // Nodes (right area)
-  const nodeCount = Math.min(cfg.nodes + Math.floor(state.level/4), 7);
-  for (let i=0;i<nodeCount;i++) {
-    const p = free();
-    if (!used.has(key(p.r,p.c))) {
-      state.nodes.push(place(p.r,p.c));
-      state.grid[p.r][p.c] = { type:'node', rotation:0, active:false };
-    }
+  // Nodes in right half
+  const used=new Set(srcRows.map(r=>`${r},0`));
+  let placed=0, att=0;
+  while(placed<cfg.nodes && att<400){
+    att++;
+    const nr=rnd(0,G.rows-1);
+    const nc=rnd(Math.ceil(G.cols*0.5), G.cols-1);
+    const k=`${nr},${nc}`;
+    if(!used.has(k)){ used.add(k); G.grid[nr][nc].type='node'; G.nodes.push({r:nr,c:nc,active:false}); placed++; }
   }
 
-  // Walls
-  const wallCount = cfg.walls + Math.floor(state.level/2);
-  for (let i=0;i<wallCount;i++) {
-    const p = free();
-    used.add(key(p.r,p.c));
-    state.walls.push(p);
-    state.grid[p.r][p.c] = { type:'wall', rotation:0 };
-  }
+  G.totalTime=Math.max(20, cfg.time-(G.level-1)*3);
+  G.timeLeft=G.totalTime;
+  G.simDone=false; G.beamSegs=[];
 
-  // Pieces inventory
-  state.pieces = {};
-  cfg.pieceTypes.forEach((t,i) => {
-    state.pieces[t] = Math.max(1, cfg.pieceCounts[i] + Math.floor(state.level/3));
-  });
-
-  state.moveCount = 0;
-  state.energyLeft = 100;
-  state.initialGrid = deepCopyGrid();
-  state.initialPieces = {...state.pieces};
-
+  resize();
   updateHUD();
-  buildPiecePanel();
-  renderGame();
-  resetTimer(cfg.time);
+  startTimer();
 }
 
-function deepCopyGrid() {
-  return state.grid.map(row => row.map(cell => cell ? {...cell} : null));
-}
+// ════════════════════════════════════════════════
+//  SIMULATION – correct segment-based BFS
+// ════════════════════════════════════════════════
+/*
+  Each queue entry: {r, c, dir, fromR, fromC}
+  Meaning: "beam is entering cell (r,c) coming from (fromR,fromC) in direction dir"
+  We record a beam segment from center of fromCell to center of thisCell (or edge).
+*/
+function runSim(){
+  if(G.phase!=='playing') return;
+  clearSimState();
+  G.simDone=true;
 
-// =====================================================
-// Piece panel
-// =====================================================
-const pieceCanvases = {};
+  const Q=[];
+  const visited=new Set();
 
-function drawPieceIcon(type, rot) {
-  const size = 44;
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const cx = c.getContext('2d');
-  const p = PIECES[type];
-  const ports = rotatePorts(p.ports, rot);
-  const mid = size/2;
-
-  cx.strokeStyle = p.color;
-  cx.lineWidth = 2.5;
-  cx.shadowColor = p.color;
-  cx.shadowBlur = 6;
-
-  ports.forEach(dir => {
-    const [dr,dc] = DIRS[dir];
-    cx.beginPath();
-    cx.moveTo(mid, mid);
-    cx.lineTo(mid + dc*(mid-4), mid + dr*(mid-4));
-    cx.stroke();
-  });
-
-  // Center dot
-  cx.beginPath();
-  cx.arc(mid, mid, 4, 0, Math.PI*2);
-  cx.fillStyle = p.color;
-  cx.shadowBlur = 12;
-  cx.fill();
-
-  return c;
-}
-
-function buildPiecePanel() {
-  const list = document.getElementById('piece-list');
-  list.innerHTML = '';
-  pieceCanvases;
-
-  for (const [type, count] of Object.entries(state.pieces)) {
-    if (count <= 0) continue;
-    const p = PIECES[type];
-    const btn = document.createElement('div');
-    btn.className = 'piece-btn' + (state.selectedPiece === type ? ' selected' : '');
-    btn.dataset.type = type;
-
-    const ic = drawPieceIcon(type, 0);
-    ic.style.width = '44px';
-    ic.style.height = '44px';
-    btn.appendChild(ic);
-
-    const lbl = document.createElement('div');
-    lbl.className = 'piece-label';
-    lbl.textContent = p.label;
-    btn.appendChild(lbl);
-
-    const cnt = document.createElement('div');
-    cnt.className = 'piece-count';
-    cnt.textContent = count;
-    btn.appendChild(cnt);
-
-    btn.addEventListener('click', () => {
-      state.selectedPiece = state.selectedPiece === type ? null : type;
-      buildPiecePanel();
-    });
-
-    // Tooltip
-    btn.addEventListener('mouseenter', e => showTooltip(e, type));
-    btn.addEventListener('mouseleave', () => hideTooltip());
-
-    list.appendChild(btn);
-  }
-}
-
-// =====================================================
-// Port rotation
-// =====================================================
-const DIR_ORDER = ['R','D','L','U'];
-function rotateDir(dir, steps) {
-  const i = DIR_ORDER.indexOf(dir);
-  return DIR_ORDER[(i + steps) % 4];
-}
-function rotatePorts(ports, rot) {
-  return ports.map(p => rotateDir(p, rot));
-}
-
-// =====================================================
-// Simulation: BFS flood fill
-// =====================================================
-function runSimulation() {
-  // Reset
-  state.activatedNodes = new Set();
-  flowParticles = [];
-  for (const nd of state.nodes) {
-    if (state.grid[nd.r]?.[nd.c]) state.grid[nd.r][nd.c].active = false;
+  // Seed beams from sources
+  for(const src of G.sources){
+    const [dr,dc]=DR[src.dir];
+    const nr=src.r+dr, nc=src.c+dc;
+    Q.push({r:nr, c:nc, dir:src.dir, fromR:src.r, fromC:src.c});
   }
 
-  const visited = new Set(); // key: "r,c,dir"
-  const queue = [];
+  let safety=0;
+  while(Q.length && safety++<10000){
+    const beam=Q.shift();
+    const {r,c,dir,fromR,fromC}=beam;
 
-  // Start from each source going right
-  for (const src of state.sources) {
-    queue.push({ r: src.r, c: src.c, fromDir: 'L' });
-  }
-
-  while (queue.length > 0) {
-    const { r, c, fromDir } = queue.shift();
-    const vkey = `${r},${c},${fromDir}`;
-    if (visited.has(vkey)) continue;
-    visited.add(vkey);
-
-    if (r < 0 || r >= state.rows || c < 0 || c >= state.cols) continue;
-    const cell = state.grid[r][c];
-    if (cell?.type === 'wall') continue;
-
-    // Spawn flow particle
-    spawnFlowParticle(r, c);
-
-    if (cell?.type === 'node') {
-      if (!state.activatedNodes.has(`${r},${c}`)) {
-        state.activatedNodes.add(`${r},${c}`);
-        cell.active = true;
-        spawnBurst(r, c);
-      }
+    // Beam went out of bounds → draw half-segment
+    if(!ok(r,c)){
+      pushSeg(fromR,fromC, fromR+DR[dir][0]*0.5, fromC+DR[dir][1]*0.5);
       continue;
     }
 
-    // Determine outgoing directions
-    let outDirs = [];
-    if (!cell || cell.type === 'source') {
-      // Source: emit right
-      if (cell?.type === 'source') outDirs = ['R'];
-      else outDirs = DIR_KEYS.filter(d => d !== opposite(fromDir));
-    } else {
-      const ports = rotatePorts(PIECES[cell.type].ports, cell.rotation || 0);
-      const inOpp = opposite(fromDir);
-      if (!ports.includes(inOpp)) continue; // signal can't enter from this side
-      outDirs = ports.filter(p => p !== inOpp);
-    }
+    const vk=`${r},${c},${dir}`;
+    if(visited.has(vk)) continue;
+    visited.add(vk);
 
-    for (const dir of outDirs) {
-      const [dr,dc] = DIRS[dir];
-      queue.push({ r: r+dr, c: c+dc, fromDir: opposite(dir) });
+    // Draw segment from previous cell center to this cell center
+    pushSeg(fromR,fromC, r,c);
+
+    const cell=G.grid[r][c];
+    cell.lit=true;
+
+    if(cell.placed==='blocker'){
+      // beam stops here — no further propagation
+    }
+    else if(cell.placed==='reflector'){
+      // pdir 0 = backslash \  pdir 1 = slash /
+      const nd=refDir(dir, cell.pdir);
+      const [dr2,dc2]=DR[nd];
+      Q.push({r:r+dr2, c:c+dc2, dir:nd, fromR:r, fromC:c});
+    }
+    else if(cell.placed==='rotator'){
+      // rotates beam CW: pdir=0 → +1 turn, pdir=1 → +2, etc.
+      const nd=(dir + cell.pdir + 1) % 4;
+      const [dr2,dc2]=DR[nd];
+      Q.push({r:r+dr2, c:c+dc2, dir:nd, fromR:r, fromC:c});
+    }
+    else if(cell.placed==='splitter'){
+      // forward + both perpendiculars
+      for(const nd of [dir, (dir+1)%4, (dir+3)%4]){
+        const [dr2,dc2]=DR[nd];
+        Q.push({r:r+dr2, c:c+dc2, dir:nd, fromR:r, fromC:c});
+      }
+    }
+    else{
+      // empty, source, node → beam continues straight
+      const [dr2,dc2]=DR[dir];
+      if(cell.type==='node') G.nodes.find(n=>n.r===r&&n.c===c).active=true;
+      Q.push({r:r+dr2, c:c+dc2, dir:dir, fromR:r, fromC:c});
     }
   }
 
+  draw();
+  checkWin();
+}
+
+// Reflect direction mapping
+function refDir(dir, pdir){
+  // pdir 0 = \  →  R↔D, L↔U
+  if(pdir===0){
+    if(dir===0) return 1; // R→D
+    if(dir===1) return 0; // D→R
+    if(dir===2) return 3; // L→U
+    if(dir===3) return 2; // U→L
+  } else {
+    // pdir 1 = /  →  R↔U, D↔L
+    if(dir===0) return 3; // R→U
+    if(dir===3) return 0; // U→R
+    if(dir===1) return 2; // D→L
+    if(dir===2) return 1; // L→D
+  }
+}
+
+// Store segment as pixel coords
+function pushSeg(r1,c1,r2,c2){
+  const cs=G.cs;
+  G.beamSegs.push({
+    x1: c1*cs+cs/2, y1: r1*cs+cs/2,
+    x2: c2*cs+cs/2, y2: r2*cs+cs/2,
+  });
+}
+
+function clearSimState(){
+  G.beamSegs=[];
+  for(let r=0;r<G.rows;r++)
+    for(let c=0;c<G.cols;c++) G.grid[r][c].lit=false;
+  for(const n of G.nodes) n.active=false;
+  G.simDone=false;
+}
+function resetSim(){ clearSimState(); draw(); updateHUD(); }
+function clearAll(){
+  for(let r=0;r<G.rows;r++)
+    for(let c=0;c<G.cols;c++){ G.grid[r][c].placed=null; G.grid[r][c].pdir=0; }
+  resetSim();
+}
+
+// ── Win/Lose ──
+function checkWin(){
+  // Guard: only win if there are actually nodes and we ran sim
+  if(!G.simDone || G.nodes.length===0) return;
+  const active=G.nodes.filter(n=>n.active).length;
   updateHUD();
-  renderGame();
-
-  // Check win
-  const totalNodes = state.nodes.length;
-  const activated = state.activatedNodes.size;
-  if (activated === totalNodes && totalNodes > 0) {
-    setTimeout(showWin, 600);
+  if(active===G.nodes.length){
+    const bonus=Math.floor(G.timeLeft*10);
+    G.score+=1000*G.level+bonus;
+    stopTimer();
+    G.phase='win';
+    setTimeout(()=>showOverlay('win'),600);
   }
 }
 
-function opposite(dir) {
-  return { R:'L', L:'R', U:'D', D:'U' }[dir];
+// ── Timer ──
+function startTimer(){
+  stopTimer();
+  updateTimerUI();
+  G.timerID=setInterval(()=>{
+    G.timeLeft--;
+    updateTimerUI();
+    if(G.timeLeft<=0){ stopTimer(); G.phase='lose'; showOverlay('lose'); }
+  },1000);
+}
+function stopTimer(){ clearInterval(G.timerID); G.timerID=null; }
+function updateTimerUI(){
+  const s=Math.max(0,G.timeLeft);
+  const el=document.getElementById('htim');
+  el.textContent=`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+  const pct=s/G.totalTime;
+  el.style.color=pct<.25?'var(--pk)':pct<.5?'var(--ye)':'var(--gr)';
+  document.getElementById('tbar').style.width=(pct*100)+'%';
+  document.getElementById('tbar').style.background=
+    pct<.25?'linear-gradient(90deg,#ff00aa,#ff6600)':'linear-gradient(90deg,#00ff88,#00ffff)';
+}
+function updateHUD(){
+  document.getElementById('hlvl').textContent=String(G.level).padStart(2,'0');
+  document.getElementById('hscr').textContent=G.score;
+  const a=G.nodes.filter(n=>n.active).length;
+  document.getElementById('hnod').textContent=`${a}/${G.nodes.length}`;
 }
 
-// =====================================================
-// Timer
-// =====================================================
-let timerLeft = 120;
-let timerMax = 120;
+// ════════════════════════════════════════════════
+//  DRAWING
+// ════════════════════════════════════════════════
+function glo(col,sz){ CTX.shadowColor=col; CTX.shadowBlur=sz; }
+function ngl(){ CTX.shadowColor='transparent'; CTX.shadowBlur=0; }
 
-function resetTimer(seconds) {
-  clearInterval(state.timerInterval);
-  timerLeft = seconds;
-  timerMax = seconds;
-  updateTimerBar();
-}
-
-function startTimer() {
-  clearInterval(state.timerInterval);
-  state.timerInterval = setInterval(() => {
-    timerLeft = Math.max(0, timerLeft - 0.1);
-    updateTimerBar();
-    if (timerLeft <= 0) {
-      clearInterval(state.timerInterval);
-      showGameOver('Zeit abgelaufen!');
-    }
-  }, 100);
-}
-
-function updateTimerBar() {
-  const pct = (timerLeft / timerMax) * 100;
-  document.getElementById('timer-fill').style.width = pct + '%';
-  const fill = document.getElementById('timer-fill');
-  if (pct < 25) fill.style.background = 'linear-gradient(90deg,#ff0090,#ff6b00)';
-  else if (pct < 50) fill.style.background = 'linear-gradient(90deg,#ff6b00,#ffe600)';
-  else fill.style.background = 'linear-gradient(90deg,#ff6b00,#ffe600)';
-}
-
-// =====================================================
-// HUD
-// =====================================================
-function updateHUD() {
-  const setVal = (id, v) => {
-    const el = document.getElementById(id);
-    if (el.textContent !== String(v)) {
-      el.textContent = v;
-      el.classList.remove('pulse');
-      void el.offsetWidth;
-      el.classList.add('pulse');
-    }
-  };
-  setVal('hud-level', state.level);
-  setVal('hud-score', state.score);
-  setVal('hud-nodes', `${state.activatedNodes.size}/${state.nodes.length}`);
-  setVal('hud-moves', state.moveCount);
-
-  const nodePct = state.nodes.length ? (state.activatedNodes.size / state.nodes.length)*100 : 0;
-  document.getElementById('progress-fill').style.width = nodePct + '%';
-  document.getElementById('energy-fill').style.width = state.energyLeft + '%';
-}
-
-// =====================================================
-// Rendering
-// =====================================================
-function renderGame() {
-  const cs = state.cellSize;
-  const rows = state.rows, cols = state.cols;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // Background grid
-  ctx.fillStyle = '#010f18';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+function draw(){
+  const cs=G.cs;
+  CTX.clearRect(0,0,CV.width,CV.height);
+  CTX.fillStyle='#020812'; CTX.fillRect(0,0,CV.width,CV.height);
 
   // Grid lines
-  ctx.strokeStyle = 'rgba(0,245,255,0.07)';
-  ctx.lineWidth = 1;
-  for (let r=0;r<=rows;r++) {
-    ctx.beginPath(); ctx.moveTo(0,r*cs); ctx.lineTo(cols*cs,r*cs); ctx.stroke();
+  CTX.strokeStyle='#0a1f35'; CTX.lineWidth=1;
+  for(let r=0;r<=G.rows;r++){
+    CTX.beginPath(); CTX.moveTo(0,r*cs); CTX.lineTo(CV.width,r*cs); CTX.stroke();
   }
-  for (let c=0;c<=cols;c++) {
-    ctx.beginPath(); ctx.moveTo(c*cs,0); ctx.lineTo(c*cs,rows*cs); ctx.stroke();
+  for(let c=0;c<=G.cols;c++){
+    CTX.beginPath(); CTX.moveTo(c*cs,0); CTX.lineTo(c*cs,CV.height); CTX.stroke();
   }
+
+  // Lit cell backgrounds
+  if(G.simDone){
+    CTX.fillStyle='rgba(0,255,255,0.055)';
+    for(let r=0;r<G.rows;r++)
+      for(let c=0;c<G.cols;c++)
+        if(G.grid[r][c].lit) CTX.fillRect(c*cs,r*cs,cs,cs);
+  }
+
+  // Draw cells
+  for(let r=0;r<G.rows;r++)
+    for(let c=0;c<G.cols;c++) drawCell(r,c,cs);
+
+  // Draw beams on top
+  if(G.simDone) drawBeams();
+
+  // Hover
+  if(G.phase==='playing' && G.selPiece && ok(G.hoverR,G.hoverC)){
+    CTX.strokeStyle='rgba(0,255,255,0.55)'; CTX.lineWidth=2;
+    CTX.strokeRect(G.hoverC*cs+2,G.hoverR*cs+2,cs-4,cs-4);
+  }
+}
+
+function drawCell(r,c,cs){
+  const x=c*cs, y=r*cs, cx=x+cs/2, cy=y+cs/2;
+  const cell=G.grid[r][c];
 
   // Corner dots
-  ctx.fillStyle = 'rgba(0,245,255,0.15)';
-  for (let r=0;r<=rows;r++) for(let c=0;c<=cols;c++) {
-    ctx.beginPath(); ctx.arc(c*cs,r*cs,1.5,0,Math.PI*2); ctx.fill();
+  CTX.fillStyle='#0a2040';
+  for(const [dx,dy] of [[3,3],[cs-3,3],[3,cs-3],[cs-3,cs-3]]){
+    CTX.beginPath(); CTX.arc(x+dx,y+dy,1.5,0,Math.PI*2); CTX.fill();
   }
 
-  // Hovered cell highlight
-  if (state.hoveredCell && state.selectedPiece) {
-    const {r,c} = state.hoveredCell;
-    ctx.fillStyle = 'rgba(0,245,255,0.06)';
-    ctx.fillRect(c*cs+1, r*cs+1, cs-2, cs-2);
-    ctx.strokeStyle = 'rgba(0,245,255,0.4)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(c*cs+1, r*cs+1, cs-2, cs-2);
-  }
-
-  // Cells
-  for (let r=0;r<rows;r++) {
-    for (let c=0;c<cols;c++) {
-      const cell = state.grid[r][c];
-      if (!cell) continue;
-      drawCell(r, c, cell, cs);
-    }
-  }
-
-  // Flow particles overlay
-  drawFlowLines();
-}
-
-function drawCell(r, c, cell, cs) {
-  const x = c*cs, y = r*cs;
-  const mid = cs/2;
-
-  ctx.save();
-  ctx.translate(x, y);
-
-  switch(cell.type) {
-    case 'wall':
-      drawWall(mid, cs);
-      break;
-    case 'source':
-      drawSource(mid, cs);
-      break;
-    case 'node':
-      drawNode(mid, cs, cell.active);
-      break;
-    default:
-      drawPiece(cell, mid, cs);
-  }
-  ctx.restore();
-}
-
-function drawWall(mid, cs) {
-  const m = 4;
-  ctx.fillStyle = 'rgba(0,245,255,0.04)';
-  ctx.fillRect(m, m, cs-m*2, cs-m*2);
-  // Hatching
-  ctx.strokeStyle = 'rgba(0,245,255,0.12)';
-  ctx.lineWidth = 1;
-  for (let i=-cs; i<cs*2; i+=10) {
-    ctx.beginPath();
-    ctx.moveTo(m+i, m);
-    ctx.lineTo(m+i+cs, m+cs-m*2);
-    ctx.stroke();
-  }
-  ctx.strokeStyle = 'rgba(0,245,255,0.25)';
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(m, m, cs-m*2, cs-m*2);
-  // X mark
-  ctx.strokeStyle = 'rgba(0,245,255,0.2)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(m,m); ctx.lineTo(cs-m,cs-m); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(cs-m,m); ctx.lineTo(m,cs-m); ctx.stroke();
-}
-
-function drawSource(mid, cs) {
-  // Glowing source
-  ctx.shadowColor = '#39ff14';
-  ctx.shadowBlur = 20;
-  ctx.fillStyle = 'rgba(57,255,20,0.1)';
-  ctx.fillRect(4, 4, cs-8, cs-8);
-
-  ctx.strokeStyle = '#39ff14';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(4, 4, cs-8, cs-8);
-
-  ctx.shadowBlur = 30;
-  ctx.fillStyle = '#39ff14';
-  ctx.beginPath(); ctx.arc(mid, mid, 8, 0, Math.PI*2); ctx.fill();
-
-  // Arrow right
-  ctx.strokeStyle = '#010f18';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(mid-5, mid); ctx.lineTo(mid+5, mid);
-  ctx.moveTo(mid+2, mid-3); ctx.lineTo(mid+5, mid); ctx.lineTo(mid+2, mid+3);
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-}
-
-function drawNode(mid, cs, active) {
-  const color = active ? '#ff0090' : '#ff6b00';
-  ctx.shadowColor = color;
-  ctx.shadowBlur = active ? 30 : 10;
-
-  ctx.fillStyle = active ? 'rgba(255,0,144,0.15)' : 'rgba(255,107,0,0.08)';
-  ctx.fillRect(4, 4, cs-8, cs-8);
-
-  ctx.strokeStyle = color;
-  ctx.lineWidth = active ? 2.5 : 1.5;
-  ctx.strokeRect(4, 4, cs-8, cs-8);
-
-  // Concentric circles
-  for (let i=0;i<3;i++) {
-    ctx.beginPath();
-    ctx.arc(mid, mid, 4+i*5, 0, Math.PI*2);
-    ctx.strokeStyle = active ? `rgba(255,0,144,${0.6-i*0.15})` : `rgba(255,107,0,${0.4-i*0.1})`;
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-  }
-
-  ctx.fillStyle = color;
-  ctx.beginPath(); ctx.arc(mid, mid, 4, 0, Math.PI*2); ctx.fill();
-  ctx.shadowBlur = 0;
-}
-
-function drawPiece(cell, mid, cs) {
-  const p = PIECES[cell.type];
-  if (!p) return;
-  const ports = rotatePorts(p.ports, cell.rotation || 0);
-  const color = p.color;
-
-  ctx.shadowColor = color;
-  ctx.shadowBlur = 12;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 3;
-  ctx.lineCap = 'round';
-
-  // Background cell
-  ctx.fillStyle = `${color}10`;
-  ctx.fillRect(2,2,cs-4,cs-4);
-  ctx.strokeStyle = `${color}30`;
-  ctx.lineWidth = 1;
-  ctx.strokeRect(2,2,cs-4,cs-4);
-
-  // Draw wire arms
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 3;
-  ctx.shadowBlur = 12;
-  ports.forEach(dir => {
-    const [dr,dc] = DIRS[dir];
-    ctx.beginPath();
-    ctx.moveTo(mid, mid);
-    ctx.lineTo(mid + dc*(mid-2), mid + dr*(mid-2));
-    ctx.stroke();
-  });
-
-  // Center node
-  ctx.beginPath();
-  ctx.arc(mid, mid, 5, 0, Math.PI*2);
-  ctx.fillStyle = color;
-  ctx.shadowBlur = 18;
-  ctx.fill();
-  ctx.shadowBlur = 0;
-}
-
-// =====================================================
-// Flow visualization
-// =====================================================
-function spawnFlowParticle(r, c) {
-  const cs = state.cellSize;
-  const x = c*cs + cs/2;
-  const y = r*cs + cs/2;
-  for (let i=0;i<3;i++) {
-    flowParticles.push({
-      x, y,
-      vx: (Math.random()-0.5)*2,
-      vy: (Math.random()-0.5)*2,
-      life: 1,
-      decay: 0.03 + Math.random()*0.05,
-      r: 3 + Math.random()*3,
-    });
+  if(cell.type==='source'){
+    drawSource(cx,cy,cs,cell.sdir);
+  } else if(cell.type==='node'){
+    const n=G.nodes.find(n=>n.r===r&&n.c===c);
+    drawNode(cx,cy,cs,n?n.active:false);
+  } else if(cell.placed==='reflector'){
+    drawReflector(cx,cy,cs,cell.pdir);
+  } else if(cell.placed==='rotator'){
+    drawRotator(cx,cy,cs,cell.pdir);
+  } else if(cell.placed==='splitter'){
+    drawSplitter(cx,cy,cs);
+  } else if(cell.placed==='blocker'){
+    drawBlocker(cx,cy,cs);
   }
 }
 
-function spawnBurst(r, c) {
-  const cs = state.cellSize;
-  const x = c*cs + cs/2;
-  const y = r*cs + cs/2;
-  for (let i=0;i<20;i++) {
-    const angle = (i/20)*Math.PI*2;
-    particles.push({
-      x, y,
-      vx: Math.cos(angle)*4,
-      vy: Math.sin(angle)*4,
-      life: 1, decay: 0.025,
-      r: 3+Math.random()*3,
-      color: '#ff0090',
-    });
-  }
+function drawSource(cx,cy,cs,dir){
+  const rad=cs*.27;
+  glo('#ffff00',20);
+  CTX.fillStyle='rgba(255,255,0,0.1)';
+  CTX.strokeStyle='#ffff00'; CTX.lineWidth=2;
+  CTX.beginPath(); CTX.arc(cx,cy,rad,0,Math.PI*2); CTX.fill(); CTX.stroke();
+  CTX.fillStyle='#ffff00';
+  CTX.font=`bold ${Math.floor(cs*.28)}px monospace`;
+  CTX.textAlign='center'; CTX.textBaseline='middle';
+  CTX.fillText('⚡',cx,cy);
+  // Direction arrow
+  const[dR,dC]=DR[dir];
+  const ax=cx+dC*(rad+3), ay=cy+dR*(rad+3);
+  const bx=cx+dC*(cs*.46), by=cy+dR*(cs*.46);
+  CTX.strokeStyle='#ffff00'; CTX.lineWidth=2;
+  CTX.beginPath(); CTX.moveTo(ax,ay); CTX.lineTo(bx,by); CTX.stroke();
+  const ang=Math.atan2(dR,dC);
+  CTX.fillStyle='#ffff00';
+  CTX.beginPath();
+  CTX.moveTo(bx,by);
+  CTX.lineTo(bx-Math.cos(ang-.45)*7, by-Math.sin(ang-.45)*7);
+  CTX.lineTo(bx-Math.cos(ang+.45)*7, by-Math.sin(ang+.45)*7);
+  CTX.closePath(); CTX.fill();
+  ngl();
 }
 
-function drawFlowLines() {
-  if (!state.simRunning && flowParticles.length === 0) return;
-  // Flow particles are drawn on pCanvas; here just show active node glow pulses
+function drawNode(cx,cy,cs,active){
+  const rad=cs*.27;
+  const col=active?'#00ff88':'#00ffff';
+  glo(col,active?28:10);
+  CTX.strokeStyle=col; CTX.lineWidth=2;
+  CTX.beginPath();
+  for(let i=0;i<6;i++){
+    const a=i/6*Math.PI*2-Math.PI/6;
+    const px=cx+rad*Math.cos(a), py=cy+rad*Math.sin(a);
+    i===0?CTX.moveTo(px,py):CTX.lineTo(px,py);
+  }
+  CTX.closePath();
+  if(active){ CTX.fillStyle='rgba(0,255,136,0.22)'; CTX.fill(); }
+  CTX.stroke();
+  CTX.fillStyle=col;
+  CTX.font=`${Math.floor(cs*.24)}px Share Tech Mono`;
+  CTX.textAlign='center'; CTX.textBaseline='middle';
+  CTX.fillText(active?'◉':'◎',cx,cy);
+  ngl();
 }
 
-// =====================================================
-// Particle system
-// =====================================================
-function animateParticles(ts) {
-  animFrame = requestAnimationFrame(animateParticles);
-  pCtx.clearRect(0,0,pCanvas.width,pCanvas.height);
-
-  // Background ambient particles
-  if (Math.random() < 0.3) {
-    particles.push({
-      x: Math.random()*pCanvas.width,
-      y: Math.random()*pCanvas.height,
-      vx: (Math.random()-0.5)*0.5,
-      vy: -0.5-Math.random()*0.5,
-      life: 1, decay: 0.015,
-      r: 1+Math.random()*2,
-      color: '#00f5ff',
-    });
-  }
-
-  // Draw & update
-  for (let i=particles.length-1;i>=0;i--) {
-    const p = particles[i];
-    p.x += p.vx; p.y += p.vy;
-    p.life -= p.decay;
-    if (p.life <= 0) { particles.splice(i,1); continue; }
-    pCtx.save();
-    pCtx.globalAlpha = p.life * 0.7;
-    pCtx.shadowColor = p.color;
-    pCtx.shadowBlur = 8;
-    pCtx.fillStyle = p.color;
-    pCtx.beginPath();
-    pCtx.arc(p.x, p.y, p.r*p.life, 0, Math.PI*2);
-    pCtx.fill();
-    pCtx.restore();
-  }
-
-  // Flow particles on canvas
-  const canvasRect = canvas.getBoundingClientRect();
-  for (let i=flowParticles.length-1;i>=0;i--) {
-    const fp = flowParticles[i];
-    fp.x += fp.vx; fp.y += fp.vy;
-    fp.life -= fp.decay;
-    if (fp.life <= 0) { flowParticles.splice(i,1); continue; }
-    const sx = canvasRect.left + fp.x;
-    const sy = canvasRect.top + fp.y;
-    pCtx.save();
-    pCtx.globalAlpha = fp.life * 0.8;
-    pCtx.shadowColor = '#00f5ff';
-    pCtx.shadowBlur = 10;
-    pCtx.fillStyle = '#00f5ff';
-    pCtx.beginPath();
-    pCtx.arc(sx, sy, fp.r*fp.life, 0, Math.PI*2);
-    pCtx.fill();
-    pCtx.restore();
-  }
+function drawReflector(cx,cy,cs,pdir){
+  const r=cs*.36;
+  glo('#ff00aa',14);
+  CTX.strokeStyle='#ff00aa'; CTX.lineWidth=2.5;
+  CTX.beginPath();
+  if(pdir===0){ CTX.moveTo(cx-r,cy-r); CTX.lineTo(cx+r,cy+r); }  // \
+  else         { CTX.moveTo(cx+r,cy-r); CTX.lineTo(cx-r,cy+r); }  // /
+  CTX.stroke();
+  CTX.fillStyle='rgba(255,0,170,0.65)';
+  CTX.font=`bold ${Math.floor(cs*.26)}px monospace`;
+  CTX.textAlign='center'; CTX.textBaseline='middle';
+  CTX.fillText(pdir===0?'╲':'╱',cx,cy);
+  ngl();
 }
 
-// =====================================================
-// Input handling
-// =====================================================
-function cellAt(e) {
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-  const cs = state.cellSize;
-  const c = Math.floor(x / cs);
-  const r = Math.floor(y / cs);
-  if (r < 0 || r >= state.rows || c < 0 || c >= state.cols) return null;
-  return {r, c};
+function drawRotator(cx,cy,cs,pdir){
+  const r=cs*.27;
+  glo('#00ffff',12);
+  CTX.strokeStyle='#00ffff'; CTX.lineWidth=2;
+  CTX.beginPath(); CTX.arc(cx,cy,r,-0.4,Math.PI*1.7); CTX.stroke();
+  const endA=Math.PI*1.7;
+  const ax=cx+r*Math.cos(endA), ay=cy+r*Math.sin(endA);
+  CTX.fillStyle='#00ffff';
+  CTX.beginPath();
+  CTX.moveTo(ax,ay);
+  CTX.lineTo(ax-7,ay-3);
+  CTX.lineTo(ax-2,ay+7);
+  CTX.closePath(); CTX.fill();
+  const turnLabels=['+1','+2','+3','+0'];
+  CTX.fillStyle='rgba(0,255,255,0.75)';
+  CTX.font=`${Math.floor(cs*.2)}px Orbitron,monospace`;
+  CTX.textAlign='center'; CTX.textBaseline='middle';
+  CTX.fillText(turnLabels[pdir],cx,cy);
+  ngl();
 }
 
-canvas.addEventListener('mousemove', e => {
-  const pos = cellAt(e);
-  state.hoveredCell = pos;
-  renderGame();
-});
-
-canvas.addEventListener('mouseleave', () => {
-  state.hoveredCell = null;
-  renderGame();
-});
-
-canvas.addEventListener('click', e => {
-  e.preventDefault();
-  const pos = cellAt(e);
-  if (!pos) return;
-  const {r,c} = pos;
-  const cell = state.grid[r][c];
-
-  if (!state.selectedPiece) {
-    if (cell && !['wall','source','node'].includes(cell.type)) {
-      // Remove piece
-      state.grid[r][c] = null;
-      state.pieces[cell.type] = (state.pieces[cell.type]||0)+1;
-      state.moveCount++;
-      buildPiecePanel();
-      renderGame();
-    }
-    return;
-  }
-
-  const type = state.selectedPiece;
-  if ((state.pieces[type]||0) <= 0) return;
-  if (cell && ['wall','source','node'].includes(cell.type)) return;
-
-  // Return old piece
-  if (cell && cell.type !== 'wall') {
-    state.pieces[cell.type] = (state.pieces[cell.type]||0)+1;
-  }
-
-  state.grid[r][c] = { type, rotation: 0 };
-  state.pieces[type]--;
-  if (state.pieces[type] <= 0) state.selectedPiece = null;
-  state.moveCount++;
-  state.energyLeft = Math.max(0, state.energyLeft - 2);
-  updateHUD();
-  buildPiecePanel();
-  renderGame();
-});
-
-canvas.addEventListener('contextmenu', e => {
-  e.preventDefault();
-  const pos = cellAt(e);
-  if (!pos) return;
-  const {r,c} = pos;
-  const cell = state.grid[r][c];
-  if (!cell || ['wall','source','node'].includes(cell.type)) return;
-  cell.rotation = ((cell.rotation||0)+1) % 4;
-  renderGame();
-});
-
-// =====================================================
-// Tooltip
-// =====================================================
-const tooltipEl = document.getElementById('tooltip');
-const descriptions = {
-  wire_h: 'Horizontale Leitung\nLeitet Energie von Links nach Rechts.',
-  wire_v: 'Vertikale Leitung\nLeitet Energie von Oben nach Unten.',
-  wire_lr: 'Biegung (L)\nLeitet Energie um die Ecke.',
-  wire_t: 'T-Stück\nTeilt Energie in zwei Richtungen.',
-  wire_cross: 'Kreuzung\nLeitet Energie in alle 4 Richtungen.',
-  reflector: 'Reflektor\nUmlenkt Energie um 90°.',
-  splitter: 'Splitter\nTeilt Energie in 3 Richtungen.',
-};
-
-function showTooltip(e, type) {
-  tooltipEl.style.display = 'block';
-  tooltipEl.innerHTML = (descriptions[type]||type).replace('\n','<br>');
-  tooltipEl.style.left = (e.clientX+14)+'px';
-  tooltipEl.style.top  = (e.clientY-10)+'px';
+function drawSplitter(cx,cy,cs){
+  const r=cs*.31;
+  glo('#00ff88',12);
+  CTX.strokeStyle='#00ff88'; CTX.lineWidth=2;
+  CTX.beginPath(); CTX.moveTo(cx-r,cy); CTX.lineTo(cx+r,cy); CTX.stroke();
+  CTX.beginPath(); CTX.moveTo(cx+r*.15,cy); CTX.lineTo(cx+r,cy-r*.65); CTX.stroke();
+  CTX.beginPath(); CTX.moveTo(cx+r*.15,cy); CTX.lineTo(cx+r,cy+r*.65); CTX.stroke();
+  ngl();
 }
-function hideTooltip() { tooltipEl.style.display = 'none'; }
 
-// =====================================================
-// Buttons
-// =====================================================
-document.getElementById('btn-solve').addEventListener('click', () => {
-  state.simRunning = true;
-  runSimulation();
-  startTimer();
-  // Score for solving
-  state.score += state.activatedNodes.size * 50;
-  updateHUD();
-});
+function drawBlocker(cx,cy,cs){
+  const r=cs*.28;
+  glo('#ff6600',10);
+  CTX.fillStyle='rgba(255,102,0,0.18)';
+  CTX.strokeStyle='#ff6600'; CTX.lineWidth=2;
+  CTX.beginPath(); CTX.roundRect(cx-r,cy-r,r*2,r*2,4); CTX.fill(); CTX.stroke();
+  CTX.strokeStyle='#ff6600'; CTX.lineWidth=1.5;
+  CTX.beginPath(); CTX.moveTo(cx-r*.65,cy-r*.65); CTX.lineTo(cx+r*.65,cy+r*.65); CTX.stroke();
+  CTX.beginPath(); CTX.moveTo(cx+r*.65,cy-r*.65); CTX.lineTo(cx-r*.65,cy+r*.65); CTX.stroke();
+  ngl();
+}
 
-document.getElementById('btn-reset').addEventListener('click', () => {
-  clearInterval(state.timerInterval);
-  state.grid = state.initialGrid.map(row => row.map(c => c ? {...c} : null));
-  state.pieces = {...state.initialPieces};
-  state.activatedNodes = new Set();
-  state.simRunning = false;
-  state.moveCount = 0;
-  state.energyLeft = 100;
-  flowParticles = [];
-  for (const nd of state.nodes) {
-    if(state.grid[nd.r]?.[nd.c]) state.grid[nd.r][nd.c].active = false;
+function drawBeams(){
+  // Pass 1: outer glow
+  CTX.shadowColor='#00ffff'; CTX.shadowBlur=22;
+  CTX.strokeStyle='rgba(0,220,255,0.9)'; CTX.lineWidth=3;
+  CTX.lineCap='round';
+  for(const s of G.beamSegs){
+    CTX.beginPath(); CTX.moveTo(s.x1,s.y1); CTX.lineTo(s.x2,s.y2); CTX.stroke();
   }
-  resetTimer(diffConfig().time);
-  updateHUD();
-  buildPiecePanel();
-  renderGame();
-});
+  // Pass 2: bright core
+  ngl();
+  CTX.strokeStyle='rgba(200,255,255,0.95)'; CTX.lineWidth=1.2;
+  for(const s of G.beamSegs){
+    CTX.beginPath(); CTX.moveTo(s.x1,s.y1); CTX.lineTo(s.x2,s.y2); CTX.stroke();
+  }
+  CTX.lineCap='butt';
 
-document.getElementById('btn-clear').addEventListener('click', () => {
-  // Remove only placed pieces
-  for (let r=0;r<state.rows;r++) {
-    for(let c=0;c<state.cols;c++) {
-      const cell = state.grid[r][c];
-      if (cell && !['wall','source','node'].includes(cell.type)) {
-        state.pieces[cell.type] = (state.pieces[cell.type]||0)+1;
-        state.grid[r][c] = null;
+  // Dots at lit cells
+  const cs=G.cs;
+  glo('#ffffff',12);
+  CTX.fillStyle='rgba(220,255,255,0.9)';
+  for(let r=0;r<G.rows;r++)
+    for(let c=0;c<G.cols;c++)
+      if(G.grid[r][c].lit && G.grid[r][c].type!=='source'){
+        CTX.beginPath();
+        CTX.arc(c*cs+cs/2, r*cs+cs/2, 2.5, 0, Math.PI*2);
+        CTX.fill();
       }
-    }
+  ngl();
+}
+
+// ── Overlay ──
+function showOverlay(type){
+  const box=document.getElementById('obox');
+  document.getElementById('overlay').classList.remove('h');
+  if(type==='menu'){
+    box.innerHTML=`
+    <div class="otitle">NEON FLUX</div>
+    <div class="osub">CIRCUIT SOLVER</div>
+    <div class="odesc">
+      Leite den Energiestrahl durch das Raster und aktiviere alle <b>Data Nodes</b>.<br><br>
+      Platziere Komponenten, dann drücke <b>SIMULATE / RUN</b>.<br>
+      <b>Long-press / Rechtsklick</b> auf platzierte Teile zum Rotieren.
+    </div>
+    <div class="lgrid">
+      <div class="li"><div class="ld" style="background:#ffff00"></div>⚡ Source: Strahl-Quelle</div>
+      <div class="li"><div class="ld" style="background:#00ffff"></div>◎ Node: aktivieren</div>
+      <div class="li"><div class="ld" style="background:#ff00aa"></div>╲ Reflektor: Spiegel</div>
+      <div class="li"><div class="ld" style="background:#00ff88"></div>⑃ Splitter: 3-Wege</div>
+      <div class="li"><div class="ld" style="background:#00ffff;opacity:.6"></div>↻ Rotator: dreht 90°</div>
+      <div class="li"><div class="ld" style="background:#ff6600"></div>█ Blocker: stoppt</div>
+    </div>
+    <div style="font-size:10px;color:var(--dim);letter-spacing:2px;margin-bottom:10px">SCHWIERIGKEIT</div>
+    <div class="diff-row">
+      <button class="dbtn ${G.diff==='easy'?'a':''}" onclick="setDiff('easy')">Leicht</button>
+      <button class="dbtn ${G.diff==='normal'?'a':''}" onclick="setDiff('normal')">Normal</button>
+      <button class="dbtn ${G.diff==='hard'?'a':''}" onclick="setDiff('hard')">Schwer</button>
+      <button class="dbtn ${G.diff==='expert'?'a':''}" onclick="setDiff('expert')">Expert</button>
+    </div>
+    <button class="bbtn" onclick="startGame()">▶ STARTEN</button>
+    <div style="margin-top:14px;font-size:9px;color:var(--dim)">© DarkFox Co. All rights reserved.</div>`;
   }
-  buildPiecePanel();
-  renderGame();
-});
-
-document.getElementById('btn-next').addEventListener('click', () => {
-  state.level++;
-  clearInterval(state.timerInterval);
-  generateLevel();
-  document.getElementById('level-info').textContent = `LEVEL ${state.level} · ${state.difficulty.toUpperCase()}`;
-});
-
-// Win/Gameover
-document.getElementById('btn-next-level').addEventListener('click', () => {
-  document.getElementById('win-screen').style.display = 'none';
-  state.level++;
-  generateLevel();
-  document.getElementById('level-info').textContent = `LEVEL ${state.level} · ${state.difficulty.toUpperCase()}`;
-});
-
-document.getElementById('btn-restart-menu').addEventListener('click', () => {
-  document.getElementById('win-screen').style.display = 'none';
-  showStartScreen();
-});
-
-document.getElementById('btn-retry').addEventListener('click', () => {
-  document.getElementById('gameover-screen').style.display = 'none';
-  clearInterval(state.timerInterval);
-  generateLevel();
-  document.getElementById('level-info').textContent = `LEVEL ${state.level} · ${state.difficulty.toUpperCase()}`;
-});
-
-document.getElementById('btn-menu').addEventListener('click', () => {
-  document.getElementById('gameover-screen').style.display = 'none';
-  showStartScreen();
-});
-
-// =====================================================
-// Start screen
-// =====================================================
-let selectedDiff = 'easy';
-document.querySelectorAll('.diff-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    selectedDiff = btn.dataset.diff;
-  });
-});
-
-document.getElementById('btn-start-game').addEventListener('click', () => {
-  state.difficulty = selectedDiff;
-  state.level = 1;
-  state.score = 0;
-  document.getElementById('start-screen').style.display = 'none';
-  generateLevel();
-  document.getElementById('level-info').textContent = `LEVEL ${state.level} · ${state.difficulty.toUpperCase()}`;
-});
-
-// =====================================================
-// Win / Gameover screens
-// =====================================================
-function showWin() {
-  clearInterval(state.timerInterval);
-  const bonus = Math.floor(timerLeft * 10) + state.activatedNodes.size * 100;
-  state.score += bonus;
-  document.getElementById('win-stats').innerHTML =
-    `Knoten aktiviert: <b>${state.activatedNodes.size}/${state.nodes.length}</b><br>
-     Züge: <b>${state.moveCount}</b><br>
-     Zeit-Bonus: <b>+${Math.floor(timerLeft*10)}</b><br>
-     Score: <b>${state.score}</b>`;
-  document.getElementById('win-screen').style.display = 'flex';
-  // Big burst celebration
-  for (let i=0;i<60;i++) {
-    setTimeout(() => {
-      particles.push({
-        x: Math.random()*pCanvas.width,
-        y: Math.random()*pCanvas.height,
-        vx: (Math.random()-0.5)*6,
-        vy: (Math.random()-0.5)*6,
-        life: 1, decay: 0.02,
-        r: 3+Math.random()*5,
-        color: ['#39ff14','#00f5ff','#ffe600','#ff0090'][Math.floor(Math.random()*4)],
-      });
-    }, i*20);
+  else if(type==='win'){
+    const bonus=Math.floor(G.timeLeft*10);
+    box.innerHTML=`
+    <div class="otitle" style="color:var(--gr);text-shadow:0 0 20px var(--gr)">GELÖST!</div>
+    <div class="osub" style="color:var(--ye)">ALLE KNOTEN AKTIVIERT</div>
+    <div class="oscore">${G.score.toLocaleString()}</div>
+    <div style="font-size:10px;color:var(--dim);margin-bottom:16px;letter-spacing:2px">LEVEL ${G.level} · ZEITBONUS +${bonus}</div>
+    <button class="bbtn" onclick="nextLevel()">▶ NÄCHSTES LEVEL</button>
+    <button class="bbtn pk" onclick="showMenu()">⌂ MENÜ</button>`;
+  }
+  else if(type==='lose'){
+    box.innerHTML=`
+    <div class="otitle" style="color:var(--pk);text-shadow:0 0 20px var(--pk)">SYSTEM FEHLER</div>
+    <div class="osub">ZEIT ABGELAUFEN</div>
+    <div class="oscore">${G.score.toLocaleString()}</div>
+    <div style="font-size:10px;color:var(--dim);margin-bottom:16px;letter-spacing:2px">LEVEL ${G.level}</div>
+    <button class="bbtn" onclick="retryLevel()">↺ NOCHMAL</button>
+    <button class="bbtn pk" onclick="resetGame()">⌂ MENÜ</button>`;
   }
 }
 
-function showGameOver(reason) {
-  clearInterval(state.timerInterval);
-  document.getElementById('gameover-stats').innerHTML =
-    `${reason}<br>Level: <b>${state.level}</b><br>Score: <b>${state.score}</b>`;
-  document.getElementById('gameover-screen').style.display = 'flex';
+function setDiff(d){
+  G.diff=d;
+  const names={easy:'Leicht',normal:'Normal',hard:'Schwer',expert:'Expert'};
+  document.querySelectorAll('.dbtn').forEach(b=>b.classList.toggle('a', b.textContent===names[d]));
 }
-
-function showStartScreen() {
-  state.score = 0;
-  document.getElementById('start-screen').style.display = 'flex';
+function startGame(){
+  G.phase='playing';
+  document.getElementById('overlay').classList.add('h');
+  generateLevel(); draw();
 }
+function nextLevel(){ G.level++; startGame(); }
+function retryLevel(){ startGame(); }
+function resetGame(){ G.level=1; G.score=0; G.phase='menu'; stopTimer(); showOverlay('menu'); }
+function showMenu(){ stopTimer(); G.phase='menu'; showOverlay('menu'); }
 
-// =====================================================
-// Keyboard
-// =====================================================
-document.addEventListener('keydown', e => {
-  if (e.key === 'Delete' || e.key === 'Backspace') {
-    if (state.hoveredCell) {
-      const {r,c} = state.hoveredCell;
-      const cell = state.grid[r][c];
-      if (cell && !['wall','source','node'].includes(cell.type)) {
-        state.pieces[cell.type] = (state.pieces[cell.type]||0)+1;
-        state.grid[r][c] = null;
-        buildPiecePanel();
-        renderGame();
-      }
-    }
-  }
-  if (e.key === 'Escape') state.selectedPiece = null, buildPiecePanel();
-  if (e.key === ' ') { e.preventDefault(); document.getElementById('btn-solve').click(); }
-});
+// ── Utils ──
+function rnd(a,b){ return a+Math.floor(Math.random()*(b-a+1)); }
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
-// =====================================================
-// Init
-// =====================================================
-resizeParticleCanvas();
-window.addEventListener('resize', () => {
-  resizeParticleCanvas();
-  if (document.getElementById('start-screen').style.display === 'none') {
-    setupCanvas();
-    renderGame();
-  }
-});
-
-animateParticles();
+// ── Boot ──
+showOverlay('menu');
+draw();
 </script>
 </body>
 </html>
